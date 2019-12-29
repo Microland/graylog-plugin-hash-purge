@@ -14,8 +14,10 @@ import org.graylog.plugins.pipelineprocessor.ast.functions.FunctionDescriptor;
 import org.graylog.plugins.pipelineprocessor.ast.functions.ParameterDescriptor;
 
 import java.io.UnsupportedEncodingException;
+import java.lang.reflect.Parameter;
 import java.net.*;
 import java.util.Base64;
+import java.util.List;
 
 
 /**
@@ -25,13 +27,13 @@ import java.util.Base64;
 public class PurgeUUIDFunction implements Function<String> {
     public static final String NAME = "purge_hash";
 //    private static final String PARAM = "string";
-
+    private String test = "testHash";
     private final ParameterDescriptor<String, String> lookup_table_name = ParameterDescriptor
             .string("lookup_table_name")
             .description("Lookup table name")
             .build();
-    private final ParameterDescriptor<String, String> hash = ParameterDescriptor
-            .string("hash")
+    private final ParameterDescriptor<List, List> hash = ParameterDescriptor
+            .type( "hash" , List.class)
             .description("Hash value to be purged")
             .build();
     private final ParameterDescriptor<String, String> baseUrl = ParameterDescriptor
@@ -53,36 +55,40 @@ public class PurgeUUIDFunction implements Function<String> {
         HttpClient httpclient = HttpClients.createDefault();
         String bUrl = baseUrl.required(functionArgs, evaluationContext);
         String table = lookup_table_name.required(functionArgs, evaluationContext);
-        String hashVal = hash.required(functionArgs, evaluationContext);
         String keyVal = key.required(functionArgs, evaluationContext);
         String apiUrl  = bUrl + "/api/system/lookup/tables/"+table+"/purge"+"?key=";
-        URI uri = null;
-        try {
-            uri = new URI(apiUrl + URLEncoder.encode(hashVal, "UTF-8"));
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-//        System.out.println(uri);
         String pwd = "token";
         String encoding = Base64.getEncoder().encodeToString((keyVal+":"+ pwd).getBytes());
-        HttpPost httpPost = null;
-        try {
-            httpPost = new HttpPost(uri);
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-        httpPost.setHeader(HttpHeaders.AUTHORIZATION, "Basic " + encoding);
-        httpPost.setHeader("X-Requested-By", "client");
-        HttpResponse response = null;
-        try {
-            response = httpclient.execute(httpPost);
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-        assert response != null;
-        if (response.getStatusLine().getStatusCode() > 299) {
-            System.out.println(response.getStatusLine().toString());
-            return "FAILURE" + response.getStatusLine().toString();
+        List hashValList = hash.required(functionArgs, evaluationContext);
+        assert hashValList != null;
+        for(int i = 0; i<hashValList.size(); i++) {
+            String hashVal = (String) hashValList.get(i);
+//            System.out.println(hashVal);
+            URI uri = null;
+            try {
+                uri = new URI(apiUrl + URLEncoder.encode(hashVal, "UTF-8"));
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+            HttpPost httpPost = null;
+            try {
+                httpPost = new HttpPost(uri);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+            httpPost.setHeader(HttpHeaders.AUTHORIZATION, "Basic " + encoding);
+            httpPost.setHeader("X-Requested-By", "client");
+            HttpResponse response = null;
+            try {
+                response = httpclient.execute(httpPost);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+            assert response != null;
+            if (response.getStatusLine().getStatusCode() > 299) {
+                System.out.println(response.getStatusLine().toString());
+                return "FAILURE" + response.getStatusLine().toString();
+            }
         }
 //        System.out.println("Success");
         return "SUCCESS";
